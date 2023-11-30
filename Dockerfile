@@ -1,12 +1,13 @@
+# ベースとなるイメージ
 FROM node:18-alpine AS base
 
-# Install dependencies only when needed
+# 必要なときだけ依存関係をインストール
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+# libc6-compatが必要な理由を理解するには、https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine を確認してください。
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
+# 優先的なパッケージマネージャに基づいて依存関係をインストール
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
@@ -15,29 +16,29 @@ RUN \
   else echo "Lockfile not found." && exit 1; \
   fi
 
-
-# Rebuild the source code only when needed
+# 必要なときだけソースコードを再ビルド
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
+# Next.jsは完全に匿名のテレメトリーデータを収集します。
+# 詳細はこちら：https://nextjs.org/telemetry
+# ビルド中にテレメトリーを無効にしたい場合は、以下の行のコメントを外してください。
 # ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN yarn build
 
-# If using npm comment out above and use below instead
+# npmを使用している場合は、上記をコメントアウトし、代わりに以下を使用してください
 # RUN npm run build
 
-# Production image, copy all the files and run next
+# 本番イメージ、すべてのファイルをコピーしてnextを実行
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
+# ランタイム中にテレメトリーを無効にしたい場合は、以下の行のコメントを外してください。
+# ENV NEXT_TELEMETRY_DISABLED 1
 # ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN addgroup --system --gid 1001 nodejs
@@ -45,11 +46,11 @@ RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 
-# Set the correct permission for prerender cache
+# prerenderキャッシュの正しい権限を設定
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
-# Automatically leverage output traces to reduce image size
+# 自動的に出力トレースを活用してイメージサイズを縮小
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
@@ -59,9 +60,9 @@ USER nextjs
 EXPOSE 3000
 
 ENV PORT 3000
-# set hostname to localhost
+# ホスト名をlocalhostに設定
 ENV HOSTNAME "0.0.0.0"
 
-# server.js is created by next build from the standalone output
+# server.jsは、standalone出力からnext buildによって作成されます
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
 CMD ["node", "server.js"]
